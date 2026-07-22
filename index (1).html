@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LeafCheck — Field Diagnosis Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Stage 1 — classical vision, no model download, works offline</div>
+    <h1>LeafCheck</h1>
+    <p>Point the camera at a leaf. LeafCheck measures how much of it shows yellowing, browning, or dead tissue — and gives a plain-language read before harvest decisions get made.</p>
+  </header>
+
+  <div class="stage">
+    <div class="viewfinder frame-corners" id="viewfinder">
+      <video id="video" autoplay playsinline muted style="display:none;"></video>
+      <canvas id="workCanvas" style="display:none;"></canvas>
+      <canvas id="overlayCanvas" style="display:none;"></canvas>
+      <div class="hint" id="hint">Camera off.<br>Use camera or upload a leaf photo to begin.</div>
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+    </div>
+
+    <div class="controls">
+      <button class="primary" id="camBtn">Use camera</button>
+      <button class="secondary" id="uploadBtn">Upload photo</button>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+    <div class="controls" id="captureRow" style="display:none;">
+      <button class="primary" id="shotBtn">Scan this leaf</button>
+      <button class="secondary" id="cancelBtn">Cancel</button>
+    </div>
+
+    <div class="result" id="result">
+      <div class="divider"></div>
+      <div class="result-top">
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 100 140" width="96" height="134">
+            <clipPath id="leafClip">
+              <path d="M50 5 C85 25 92 70 60 118 C55 128 45 128 40 118 C8 70 15 25 50 5 Z"/>
+            </clipPath>
+            <path d="M50 5 C85 25 92 70 60 118 C55 128 45 128 40 118 C8 70 15 25 50 5 Z"
+                  fill="#e2d8ba" stroke="#c9bd9c" stroke-width="1.5"/>
+            <rect id="fillRect" x="0" y="140" width="100" height="140" fill="#7fae5c" clip-path="url(#leafClip)"/>
+            <path d="M50 118 L50 20" stroke="#5a5142" stroke-width="1" opacity="0.35"/>
+          </svg>
+          <div class="gauge-label" id="gaugeLabel">—</div>
+        </div>
+        <div class="diagnosis">
+          <span class="status-pill" id="statusPill">—</span>
+          <h2 id="diagTitle">Awaiting scan</h2>
+          <p class="advice" id="diagAdvice">Results will appear here.</p>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <details>
+        <summary>How this scan works</summary>
+        <p>
+          Every pixel is converted from red-green-blue values into <code>hue, saturation, value</code> —
+          the same color space OpenCV's <code>cv2.cvtColor</code> uses. Pixels in the healthy green
+          hue band count as leaf tissue; pixels in the yellow-brown band, or very dark low-value pixels,
+          count as lesion tissue. Severity is lesion pixels divided by total leaf pixels. No model,
+          no internet connection, no upload required — everything happens on this device.
+        </p>
+      </details>
+    </div>
+  </div>
+
+  <footer>
+    <p>NO NETWORK CALLS · RUNS FULLY OFFLINE · STAGE 2 ADDS A TRAINED MODEL FOR SUBTLER DISEASES</p>
+  </footer>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

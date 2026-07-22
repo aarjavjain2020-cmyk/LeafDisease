@@ -1,0 +1,99 @@
+:root{
+  --bg-deep:#1c2b1f;
+  --bg-deep-2:#243523;
+  --card:#f1e9d2;
+  --ink:#2a2118;
+  --ink-soft:#5a5142;
+  --leaf:#7fae5c;
+  --leaf-dim:#4d7a3a;
+  --clay:#d9a441;
+  --rust:#b24a2e;
+  --line:rgba(241,233,210,0.14);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:radial-gradient(120% 140% at 15% -10%, var(--bg-deep-2), var(--bg-deep) 60%);
+  color:var(--card);
+  font-family:'Inter',system-ui,sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important;} }
+
+:focus-visible{ outline:2px solid var(--leaf); outline-offset:3px; border-radius:4px; }
+
+.wrap{ max-width:520px; margin:0 auto; padding:28px 20px 64px; }
+
+header{ margin-bottom:22px; }
+.eyebrow{
+  font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.14em;
+  color:var(--leaf); text-transform:uppercase; margin-bottom:6px;
+}
+h1{
+  font-family:'Fraunces', serif; font-weight:600; font-size:34px; line-height:1.05;
+  margin:0 0 8px; color:var(--card);
+}
+header p{ margin:0; color:#cfc7ac; font-size:14.5px; line-height:1.5; max-width:420px; }
+
+.stage{
+  background:var(--card); color:var(--ink); border-radius:18px;
+  padding:18px; margin-top:18px; box-shadow:0 18px 40px -18px rgba(0,0,0,0.55);
+}
+
+.viewfinder{
+  position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden;
+  background:#0f1810; display:flex; align-items:center; justify-content:center;
+}
+.viewfinder video, .viewfinder canvas, .viewfinder img{
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+.viewfinder .hint{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  color:#9fb391; font-size:13px; text-align:center; padding:24px; font-family:'IBM Plex Mono',monospace;
+}
+.corner{ position:absolute; width:26px; height:26px; border-color:var(--leaf); pointer-events:none; }
+.corner.tl{ top:10px; left:10px; border-top:3px solid; border-left:3px solid; border-radius:6px 0 0 0;}
+.corner.tr{ top:10px; right:10px; border-top:3px solid; border-right:3px solid; border-radius:0 6px 0 0;}
+.corner.bl{ bottom:10px; left:10px; border-bottom:3px solid; border-left:3px solid; border-radius:0 0 0 6px;}
+.corner.br{ bottom:10px; right:10px; border-bottom:3px solid; border-right:3px solid; border-radius:0 0 6px 0;}
+
+.controls{ display:flex; gap:10px; margin-top:14px; }
+button.primary, button.secondary{
+  flex:1; border:none; border-radius:11px; padding:14px 12px; font-family:'Inter';
+  font-weight:600; font-size:14.5px; cursor:pointer; transition:transform .15s ease, opacity .15s ease;
+}
+button.primary{ background:var(--leaf-dim); color:#fff; }
+button.primary:hover{ background:#436a32; }
+button.secondary{ background:transparent; color:var(--ink); border:1.5px solid #c9bd9c; }
+button.secondary:hover{ background:rgba(0,0,0,0.04); }
+button:active{ transform:scale(0.98); }
+button:disabled{ opacity:.45; cursor:not-allowed; }
+input[type=file]{ display:none; }
+
+.result{ margin-top:18px; display:none; }
+.result.show{ display:block; }
+.result-top{ display:flex; align-items:center; gap:18px; }
+
+.gauge-wrap{ flex-shrink:0; width:96px; }
+.gauge-label{
+  text-align:center; font-family:'IBM Plex Mono',monospace; font-size:20px; margin-top:6px; color:var(--ink);
+}
+#fillRect{ transition:y .5s ease, height .5s ease; }
+
+.diagnosis h2{ font-family:'Fraunces',serif; font-size:22px; margin:0 0 4px; }
+.diagnosis .advice{ font-size:14px; color:var(--ink-soft); line-height:1.45; margin:0; }
+.status-pill{
+  display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.06em;
+  padding:3px 9px; border-radius:20px; margin-bottom:6px; text-transform:uppercase;
+}
+
+.divider{ height:1px; background:#e2d8ba; margin:16px 0; }
+
+details{ font-size:13.5px; color:var(--ink-soft); }
+summary{ cursor:pointer; font-weight:600; color:var(--ink); font-size:13.5px; }
+details p{ line-height:1.55; margin:8px 0 0; }
+details code{ background:#e6dcbe; padding:1px 5px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:12px;}
+
+footer{ margin-top:26px; text-align:center; }
+footer p{ font-size:12px; color:#8fa280; font-family:'IBM Plex Mono',monospace; }
