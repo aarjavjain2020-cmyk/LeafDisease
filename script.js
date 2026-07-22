@@ -14,6 +14,11 @@ const gaugeLabel = document.getElementById('gaugeLabel');
 const statusPill = document.getElementById('statusPill');
 const diagTitle = document.getElementById('diagTitle');
 const diagAdvice = document.getElementById('diagAdvice');
+const patternRow = document.getElementById('patternRow');
+const patternLabel = document.getElementById('patternLabel');
+const patternNote = document.getElementById('patternNote');
+const assocWrap = document.getElementById('assocWrap');
+const assocTags = document.getElementById('assocTags');
 
 let stream = null;
 const WORK_SIZE = 260; // downscale for fast per-pixel analysis
@@ -30,7 +35,6 @@ async function startCamera(){
     video.srcObject = stream;
     showOnly(video);
     captureRow.style.display = 'flex';
-    resultEl.classList.remove('show');
   }catch(err){
     hint.style.display = 'flex';
     hint.textContent = 'Camera unavailable (' + err.name + '). Try "Upload photo" instead.';
@@ -80,13 +84,40 @@ function rgbToHsv(r, g, b){
   return [h, s, v];
 }
 
+// Iterative 4-connectivity flood fill — the same idea as cv2.connectedComponents,
+// just written by hand so it runs with nothing but the browser's canvas API.
+function findBlobs(mask, w, h){
+  const visited = new Uint8Array(w * h);
+  const blobs = [];
+  for (let start = 0; start < mask.length; start++){
+    if (!mask[start] || visited[start]) continue;
+    const stack = [start];
+    visited[start] = 1;
+    let size = 0, touchesEdge = false;
+    while (stack.length){
+      const idx = stack.pop();
+      size++;
+      const x = idx % w, y = (idx / w) | 0;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) touchesEdge = true;
+      const neighbors = [idx-1, idx+1, idx-w, idx+w];
+      for (const n of neighbors){
+        if (n < 0 || n >= mask.length) continue;
+        if (x === 0 && n === idx - 1) continue;
+        if (x === w - 1 && n === idx + 1) continue;
+        if (mask[n] && !visited[n]){ visited[n] = 1; stack.push(n); }
+      }
+    }
+    blobs.push({ size, touchesEdge });
+  }
+  return blobs;
+}
+
 function analyzeImageSource(source){
   const w = WORK_SIZE, h = WORK_SIZE;
   workCanvas.width = w; workCanvas.height = h;
   overlayCanvas.width = w; overlayCanvas.height = h;
   const ctx = workCanvas.getContext('2d');
 
-  // center-crop to a square before downscaling, so we're not comparing a squished image
   const sw = source.videoWidth || source.naturalWidth || source.width;
   const sh = source.videoHeight || source.naturalHeight || source.height;
   const side = Math.min(sw, sh);
@@ -100,24 +131,28 @@ function analyzeImageSource(source){
   const outData = octx.createImageData(w, h);
   const out = outData.data;
 
-  let leafPixels = 0, lesionPixels = 0;
+  const lesionMask = new Uint8Array(w * h);
+  let leafPixels = 0, lesionPixels = 0, mildewPixels = 0;
 
-  for (let i = 0; i < data.length; i += 4){
+  for (let i = 0, p = 0; i < data.length; i += 4, p++){
     const r = data[i], g = data[i+1], b = data[i+2];
     const [hue, sat, val] = rgbToHsv(r, g, b);
 
     const isHealthy = hue >= 65 && hue <= 170 && sat > 0.18 && val > 0.18;
-    const isLesion  = (hue >= 15 && hue < 65 && sat > 0.22 && val > 0.15) || (val < 0.22 && sat > 0.08 && sat < 0.7);
+    const isDarkOrBrown = (hue >= 15 && hue < 65 && sat > 0.22 && val > 0.15) || (val < 0.22 && sat > 0.08 && sat < 0.7);
+    const isMildew = sat < 0.14 && val > 0.45 && !isHealthy;
+    const isLesion = isDarkOrBrown || isMildew;
 
     if (isHealthy) leafPixels++;
-    if (isLesion) lesionPixels++;
+    if (isLesion){ lesionPixels++; lesionMask[p] = 1; }
+    if (isMildew) mildewPixels++;
 
     if (isLesion){
-      out[i]=178; out[i+1]=45; out[i+2]=35; out[i+3]=235;      // rust red overlay
+      out[i]=178; out[i+1]=45; out[i+2]=35; out[i+3]=235;
     } else if (isHealthy){
       out[i]=r; out[i+1]=g; out[i+2]=b; out[i+3]=255;
     } else {
-      out[i]=r*0.35; out[i+1]=g*0.35; out[i+2]=b*0.35; out[i+3]=255; // dim non-plant background
+      out[i]=r*0.35; out[i+1]=g*0.35; out[i+2]=b*0.35; out[i+3]=255;
     }
   }
 
@@ -128,39 +163,82 @@ function analyzeImageSource(source){
   const totalPixels = w * h;
 
   if (plantPixels < totalPixels * 0.06){
-    renderResult(null, 0, 'no-leaf');
-  } else {
-    const severity = (lesionPixels / plantPixels) * 100;
-    renderResult(severity, plantPixels / totalPixels, severity < 8 ? 'healthy' : severity < 25 ? 'moderate' : 'severe');
+    renderResult({ key: 'no-leaf' });
+    return;
   }
+
+  const severity = (lesionPixels / plantPixels) * 100;
+  const severityKey = severity < 8 ? 'healthy' : severity < 25 ? 'moderate' : 'severe';
+
+  if (severityKey === 'healthy'){
+    renderResult({ key: 'healthy', severity });
+    return;
+  }
+
+  const blobs = findBlobs(lesionMask, w, h).filter(b => b.size >= 6); // drop noise specks
+  const blobCount = blobs.length || 1;
+  const avgBlobSize = lesionPixels / blobCount;
+  const edgeTouchRatio = blobs.filter(b => b.touchesEdge).length / blobCount;
+  const mildewRatio = mildewPixels / plantPixels;
+
+  let pattern;
+  if (mildewRatio > 0.12){
+    pattern = 'mildew';
+  } else if (blobCount >= 6 && avgBlobSize < 90 && edgeTouchRatio < 0.35){
+    pattern = 'spot';
+  } else if (edgeTouchRatio > 0.4 && avgBlobSize >= 90){
+    pattern = 'blight';
+  } else {
+    pattern = 'diffuse';
+  }
+
+  renderResult({ key: severityKey, severity, pattern });
 }
 
 const COPY = {
   'no-leaf': {
-    pill:'No leaf detected', pillBg:'#e2d8ba', pillColor:'#5a5142',
+    pill:'No leaf detected', pillBg:'#e8e6dc', pillColor:'#4a4844',
     title:'Fill more of the frame', advice:'Move closer so the leaf takes up most of the square, then scan again.',
-    gaugeColor:'#c9bd9c'
+    gaugeColor:'#b0aea5'
   },
   healthy: {
-    pill:'Healthy', pillBg:'#dcecd0', pillColor:'#3d6b2a',
+    pill:'Healthy', pillBg:'#e4e8dc', pillColor:'#4d5c3a',
     title:'Looks healthy', advice:'Little to no discoloration detected. No action needed — recheck in a few days.',
-    gaugeColor:'#7fae5c'
+    gaugeColor:'#788c5d'
   },
   moderate: {
-    pill:'Early signs', pillBg:'#f3e3bb', pillColor:'#8a5f16',
-    title:'Early signs of stress', advice:'Some yellowing or spotting detected. Inspect nearby plants and watch for spread over the next 2–3 days.',
-    gaugeColor:'#d9a441'
+    pill:'Early signs', pillBg:'#f4e2d8', pillColor:'#8a4d30',
+    title:'Early signs of stress', advice:'Watch for spread over the next 2–3 days before deciding whether treatment is worth the cost.',
+    gaugeColor:'#d97757'
   },
   severe: {
-    pill:'Advanced', pillBg:'#f0d3ca', pillColor:'#7a2c19',
-    title:'Significant leaf damage', advice:'Large diseased area detected. Consider isolating or removing affected plants and consult local extension guidance before harvest.',
-    gaugeColor:'#b24a2e'
+    pill:'Advanced', pillBg:'#f0d3c5', pillColor:'#7a3a1f',
+    title:'Significant leaf damage', advice:'Consider isolating affected plants and consulting local extension guidance before harvest.',
+    gaugeColor:'#b85c3e'
   }
 };
 
-function renderResult(severity, coverage, key){
+const PATTERNS = {
+  spot: {
+    label:'Leaf-spot pattern', note:'many small, separate lesions',
+    tags:['Septoria leaf spot','Bacterial spot','Alternaria leaf spot']
+  },
+  blight: {
+    label:'Blight pattern', note:'large lesions reaching the leaf edge',
+    tags:['Early blight','Late blight','Bacterial blight']
+  },
+  mildew: {
+    label:'Powdery-mildew pattern', note:'pale, dusty-looking texture',
+    tags:['Powdery mildew']
+  },
+  diffuse: {
+    label:'Diffuse chlorosis pattern', note:'soft, spreading discoloration, no sharp lesions',
+    tags:['Nutrient deficiency','Natural senescence','Early-stage infection']
+  }
+};
+
+function renderResult({ key, severity = null, pattern = null }){
   const c = COPY[key];
-  resultEl.classList.add('show');
   statusPill.textContent = c.pill;
   statusPill.style.background = c.pillBg;
   statusPill.style.color = c.pillColor;
@@ -175,4 +253,16 @@ function renderResult(severity, coverage, key){
   fillRect.setAttribute('y', 140 - fillHeight - 6);
   fillRect.setAttribute('height', fillHeight);
   fillRect.setAttribute('fill', c.gaugeColor);
+
+  if (pattern && PATTERNS[pattern]){
+    const p = PATTERNS[pattern];
+    patternRow.style.display = 'flex';
+    patternLabel.textContent = p.label;
+    patternNote.textContent = '· ' + p.note;
+    assocWrap.style.display = 'block';
+    assocTags.innerHTML = p.tags.map(t => `<span>${t}</span>`).join('');
+  } else {
+    patternRow.style.display = 'none';
+    assocWrap.style.display = 'none';
+  }
 }
