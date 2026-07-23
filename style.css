@@ -7,6 +7,7 @@
   --orange-deep:#b85c3e;
   --blue:#6a9bcc;
   --green:#788c5d;
+  --bg:#255125
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
